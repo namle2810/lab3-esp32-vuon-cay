@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "author": "Lab 3",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-dht22", "id": "dht1", "top": -100, "left": 210, "attrs": { "temperature": "27", "humidity": "52" } },
+    { "type": "wokwi-led", "id": "mist", "top": 30, "left": 300, "attrs": { "color": "blue", "label": "Mist" } },
+    { "type": "wokwi-led", "id": "pump", "top": 100, "left": 300, "attrs": { "color": "green", "label": "Pump" } },
+    { "type": "wokwi-led", "id": "fan", "top": 170, "left": 300, "attrs": { "color": "yellow", "label": "Fan" } }
+  ],
+  "connections": [
+    [ "esp:3V3", "dht1:VCC", "red", [] ],
+    [ "esp:GND.1", "dht1:GND", "black", [] ],
+    [ "esp:15", "dht1:SDA", "green", [] ],
+    [ "esp:25", "mist:A", "blue", [] ],
+    [ "mist:C", "esp:GND.1", "black", [] ],
+    [ "esp:26", "pump:A", "green", [] ],
+    [ "pump:C", "esp:GND.1", "black", [] ],
+    [ "esp:27", "fan:A", "yellow", [] ],
+    [ "fan:C", "esp:GND.1", "black", [] ]
+  ],
+  "dependencies": {}
+}

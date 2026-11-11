@@ -1,0 +1,1012 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Garden IoT Dashboard</title>
+
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+}
+
+body {
+    background: #f1f5f9;
+    color: #1e293b;
+    padding: 25px;
+}
+
+.container {
+    max-width: 1200px;
+    margin: auto;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+header h1 {
+    color: #166534;
+    font-size: 26px;
+}
+
+.connection {
+    background: #e2e8f0;
+    padding: 10px 15px;
+    border-radius: 20px;
+    font-size: 14px;
+}
+
+.status-dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: gray;
+    margin-right: 7px;
+}
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
+    margin-bottom: 25px;
+}
+
+.card {
+    background: white;
+    padding: 22px;
+    border-radius: 14px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.06);
+}
+
+.card h3 {
+    font-size: 15px;
+    color: #64748b;
+    margin-bottom: 15px;
+}
+
+.value {
+    font-size: 35px;
+    font-weight: bold;
+    color: #15803d;
+}
+
+.unit {
+    font-size: 16px;
+    color: #64748b;
+}
+
+.sub {
+    margin-top: 10px;
+    font-size: 13px;
+    color: #64748b;
+}
+
+.section-title {
+    margin: 25px 0 15px;
+    font-size: 20px;
+}
+
+.charts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 18px;
+}
+
+.chart-card {
+    background: white;
+    padding: 20px;
+    border-radius: 14px;
+    height: 320px;
+}
+
+.chart-card canvas {
+    max-height: 250px;
+}
+
+.mister-box {
+    background: white;
+    padding: 22px;
+    border-radius: 14px;
+    margin-top: 20px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.06);
+}
+
+.mister-value {
+    font-size: 28px;
+    font-weight: bold;
+    color: #0284c7;
+    margin: 12px 0;
+}
+
+.mister-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.mister-item {
+    background: #f1f5f9;
+    padding: 15px;
+    border-radius: 10px;
+}
+
+.mister-item p {
+    font-size: 13px;
+    color: #64748b;
+    margin-bottom: 8px;
+}
+
+.mister-item strong {
+    font-size: 22px;
+    color: #0f172a;
+}
+
+.progress {
+    background: #e2e8f0;
+    width: 100%;
+    height: 14px;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 15px 0;
+}
+
+.progress-bar {
+    background: #0ea5e9;
+    height: 100%;
+    width: 0%;
+    transition: width 0.3s;
+}
+
+.control-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 18px;
+}
+
+.control-card {
+    background: white;
+    padding: 22px;
+    border-radius: 14px;
+}
+
+.control-card h3 {
+    margin-bottom: 15px;
+}
+
+.state {
+    font-weight: bold;
+    margin-bottom: 12px;
+}
+
+button {
+    border: none;
+    padding: 11px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    margin: 4px 4px 4px 0;
+}
+
+.on {
+    background: #16a34a;
+    color: white;
+}
+
+.off {
+    background: #dc2626;
+    color: white;
+}
+
+button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.footer {
+    text-align: center;
+    margin-top: 25px;
+    color: #64748b;
+    font-size: 13px;
+}
+
+@media(max-width: 600px) {
+
+    body {
+        padding: 12px;
+    }
+
+    header h1 {
+        font-size: 21px;
+    }
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<!-- HEADER -->
+
+<header>
+
+    <div>
+        <h1>🌱 Garden IoT Dashboard</h1>
+        <p class="sub">
+            Hệ thống giám sát vườn cây công nghiệp
+        </p>
+    </div>
+
+    <div class="connection">
+
+        <span class="status-dot" id="statusDot"></span>
+
+        <span id="mqttStatus">
+            Đang kết nối MQTT...
+        </span>
+
+    </div>
+
+</header>
+
+
+<!-- SENSOR CARDS -->
+
+<div class="cards">
+
+    <div class="card">
+
+        <h3>🌡️ Nhiệt độ</h3>
+
+        <div class="value">
+            <span id="temperature">--</span>
+            <span class="unit">°C</span>
+        </div>
+
+        <div class="sub">
+            Cảm biến DHT22
+        </div>
+
+    </div>
+
+
+    <div class="card">
+
+        <h3>💧 Độ ẩm không khí</h3>
+
+        <div class="value">
+            <span id="humidity">--</span>
+            <span class="unit">%</span>
+        </div>
+
+        <div class="sub">
+            Mức tham chiếu: 40–60%
+        </div>
+
+    </div>
+
+</div>
+
+
+<p class="sub">
+    Thời gian nhận dữ liệu gần nhất:
+    <strong id="lastUpdate">Chưa có dữ liệu</strong>
+</p>
+
+
+<!-- MISTER CONTROL -->
+
+<h2 class="section-title">
+    🌫️ Giám sát máy phun sương tự động
+</h2>
+
+<div class="mister-box">
+
+    <h3>Trạng thái máy phun sương</h3>
+
+    <div class="mister-value" id="misterStatus">
+        Chưa có dữ liệu
+    </div>
+
+    <div class="progress">
+
+        <div
+            class="progress-bar"
+            id="misterProgress">
+        </div>
+
+    </div>
+
+    <div class="mister-grid">
+
+        <div class="mister-item">
+
+            <p>Công suất hiện tại</p>
+
+            <strong id="misterDuty">0%</strong>
+
+        </div>
+
+
+        <div class="mister-item">
+
+            <p>Thời gian chu kỳ</p>
+
+            <strong id="misterDuration">0 giây</strong>
+
+        </div>
+
+
+        <div class="mister-item">
+
+            <p>Thời gian đã phun</p>
+
+            <strong id="misterElapsed">0 giây</strong>
+
+        </div>
+
+
+        <div class="mister-item">
+
+            <p>Thời gian còn lại</p>
+
+            <strong id="misterRemaining">0 giây</strong>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- CHARTS -->
+
+<h2 class="section-title">
+    📊 Biểu đồ dữ liệu thời gian thực
+</h2>
+
+<div class="charts">
+
+    <div class="chart-card">
+
+        <h3>Nhiệt độ (°C)</h3>
+
+        <canvas id="temperatureChart"></canvas>
+
+    </div>
+
+
+    <div class="chart-card">
+
+        <h3>Độ ẩm (%)</h3>
+
+        <canvas id="humidityChart"></canvas>
+
+    </div>
+
+</div>
+
+
+<!-- MANUAL CONTROL -->
+
+<h2 class="section-title">
+    🎛️ Điều khiển thiết bị thủ công
+</h2>
+
+<div class="control-grid">
+
+    <!-- PUMP -->
+
+    <div class="control-card">
+
+        <h3>💦 Máy bơm nước</h3>
+
+        <p class="state">
+            ESP32 báo cáo:
+            <span id="pumpState">Chưa có dữ liệu</span>
+        </p>
+
+        <p class="sub">
+            Lệnh cuối đã gửi:
+            <strong id="pumpCommand">Chưa gửi</strong>
+        </p>
+
+        <button
+            class="on"
+            onclick="controlDevice('pump','ON')">
+
+            Bật bơm
+
+        </button>
+
+        <button
+            class="off"
+            onclick="controlDevice('pump','OFF')">
+
+            Tắt bơm
+
+        </button>
+
+    </div>
+
+
+    <!-- FAN -->
+
+    <div class="control-card">
+
+        <h3>🌀 Quạt thông gió</h3>
+
+        <p class="state">
+            ESP32 báo cáo:
+            <span id="fanState">Chưa có dữ liệu</span>
+        </p>
+
+        <p class="sub">
+            Lệnh cuối đã gửi:
+            <strong id="fanCommand">Chưa gửi</strong>
+        </p>
+
+        <button
+            class="on"
+            onclick="controlDevice('fan','ON')">
+
+            Bật quạt
+
+        </button>
+
+        <button
+            class="off"
+            onclick="controlDevice('fan','OFF')">
+
+            Tắt quạt
+
+        </button>
+
+    </div>
+
+</div>
+
+
+<div class="footer">
+
+    Garden IoT System | ESP32 - FreeRTOS - MQTT
+
+</div>
+
+</div>
+
+
+<script>
+
+// ==================================================
+// 1. MQTT CONFIGURATION
+// ==================================================
+
+const DEVICE_ID = "gardenlab3-esp32";
+
+const MQTT_URL = "wss://broker.emqx.io:8084/mqtt";
+
+const TOPIC_TELEMETRY =
+    DEVICE_ID + "/garden/telemetry";
+
+const TOPIC_PUMP =
+    DEVICE_ID + "/garden/command/pump";
+
+const TOPIC_FAN =
+    DEVICE_ID + "/garden/command/fan";
+
+let mqttClient = null;
+
+let lastPumpCommand = null;
+let lastFanCommand = null;
+
+
+// ==================================================
+// 2. MISTER COUNTDOWN VARIABLES
+// ==================================================
+
+let misterIsRunning = false;
+
+let misterElapsedDisplay = 0;
+let misterRemainingDisplay = 0;
+
+let lastCountdownTime = Date.now();
+
+
+// ==================================================
+// 3. CHART CONFIGURATION
+// ==================================================
+
+const labels = [];
+const temperatureData = [];
+const humidityData = [];
+
+
+const temperatureChart = new Chart(
+    document.getElementById("temperatureChart"),
+    {
+        type: "line",
+
+        data: {
+            labels: labels,
+
+            datasets: [{
+                label: "Nhiệt độ",
+                data: temperatureData,
+                borderColor: "#ef4444",
+                backgroundColor: "rgba(239,68,68,0.1)",
+                tension: 0.3,
+                fill: true
+            }]
+        },
+
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+
+            scales: {
+                y: {
+                    title: {
+                        display: true,
+                        text: "°C"
+                    }
+                }
+            }
+        }
+    }
+);
+
+
+const humidityChart = new Chart(
+    document.getElementById("humidityChart"),
+    {
+        type: "line",
+
+        data: {
+            labels: labels,
+
+            datasets: [{
+                label: "Độ ẩm",
+                data: humidityData,
+                borderColor: "#0ea5e9",
+                backgroundColor: "rgba(14,165,233,0.1)",
+                tension: 0.3,
+                fill: true
+            }]
+        },
+
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+
+            scales: {
+                y: {
+                    min: 0,
+                    max: 100,
+
+                    title: {
+                        display: true,
+                        text: "%"
+                    }
+                }
+            }
+        }
+    }
+);
+
+
+// ==================================================
+// 4. MQTT STATUS
+// ==================================================
+
+function setMQTTStatus(connected) {
+
+    const status =
+        document.getElementById("mqttStatus");
+
+    const dot =
+        document.getElementById("statusDot");
+
+    if (connected) {
+
+        status.innerText = "MQTT đã kết nối";
+
+        dot.style.background = "#16a34a";
+
+    } else {
+
+        status.innerText = "MQTT mất kết nối";
+
+        dot.style.background = "#dc2626";
+    }
+}
+
+
+// ==================================================
+// 5. UPDATE MISTER DISPLAY
+// ==================================================
+
+function updateMisterDisplay() {
+
+    document.getElementById("misterElapsed").innerText =
+        misterElapsedDisplay + " giây";
+
+    document.getElementById("misterRemaining").innerText =
+        misterRemainingDisplay + " giây";
+}
+
+
+// ==================================================
+// 6. COUNTDOWN TIMER
+// ==================================================
+
+setInterval(function() {
+
+    const now = Date.now();
+
+    if (misterIsRunning) {
+
+        const secondsPassed =
+            Math.floor((now - lastCountdownTime) / 1000);
+
+        if (secondsPassed >= 1) {
+
+            const count =
+                Math.min(secondsPassed, misterRemainingDisplay);
+
+            misterElapsedDisplay += count;
+
+            misterRemainingDisplay -= count;
+
+            lastCountdownTime = now;
+
+            updateMisterDisplay();
+        }
+
+    } else {
+
+        lastCountdownTime = now;
+    }
+
+}, 200);
+
+
+// ==================================================
+// 7. CONNECT MQTT
+// ==================================================
+
+function connectMQTT() {
+
+    mqttClient = mqtt.connect(MQTT_URL, {
+
+        clientId: "garden_web_" +
+            Math.random().toString(16).substring(2, 10),
+
+        clean: true,
+
+        connectTimeout: 10000,
+
+        reconnectPeriod: 3000
+    });
+
+
+    mqttClient.on("connect", function() {
+
+        setMQTTStatus(true);
+
+        console.log("MQTT Connected!");
+
+        mqttClient.subscribe(
+            TOPIC_TELEMETRY,
+            function(error) {
+
+                if (error) {
+
+                    console.error(
+                        "Subscribe error:",
+                        error
+                    );
+
+                } else {
+
+                    console.log(
+                        "Subscribed:",
+                        TOPIC_TELEMETRY
+                    );
+                }
+            }
+        );
+    });
+
+
+    mqttClient.on("reconnect", function() {
+
+        setMQTTStatus(false);
+    });
+
+
+    mqttClient.on("offline", function() {
+
+        setMQTTStatus(false);
+    });
+
+
+    mqttClient.on("error", function(error) {
+
+        console.error("MQTT Error:", error);
+
+        setMQTTStatus(false);
+    });
+
+
+    mqttClient.on("message", function(topic, message) {
+
+        if (topic !== TOPIC_TELEMETRY) {
+            return;
+        }
+
+        try {
+
+            const data =
+                JSON.parse(message.toString());
+
+            if (
+                typeof data.temperature !== "number" ||
+                typeof data.humidity !== "number"
+            ) {
+
+                console.error("JSON khong dung dinh dang!");
+
+                return;
+            }
+
+            updateDashboard(data);
+
+        } catch (error) {
+
+            console.error("Loi doc JSON:", error);
+        }
+    });
+}
+
+
+// ==================================================
+// 8. UPDATE DASHBOARD
+// ==================================================
+
+function updateDashboard(data) {
+
+    // ----------------------------------------------
+    // SENSOR DATA
+    // ----------------------------------------------
+
+    document.getElementById("temperature").innerText =
+        data.temperature.toFixed(1);
+
+    document.getElementById("humidity").innerText =
+        data.humidity.toFixed(1);
+
+    document.getElementById("lastUpdate").innerText =
+        new Date().toLocaleTimeString("vi-VN");
+
+
+    // ----------------------------------------------
+    // PUMP STATE
+    // ----------------------------------------------
+
+    if (typeof data.pump === "boolean") {
+
+        document.getElementById("pumpState").innerText =
+            data.pump ? "ĐANG BẬT" : "ĐANG TẮT";
+    }
+
+
+    // ----------------------------------------------
+    // FAN STATE
+    // ----------------------------------------------
+
+    if (typeof data.fan === "boolean") {
+
+        document.getElementById("fanState").innerText =
+            data.fan ? "ĐANG BẬT" : "ĐANG TẮT";
+    }
+
+
+    // ----------------------------------------------
+    // MISTER STATE
+    // ----------------------------------------------
+
+    if (typeof data.mister_on === "boolean") {
+
+        misterIsRunning = data.mister_on;
+
+        document.getElementById("misterStatus").innerText =
+            misterIsRunning
+            ? "ĐANG PHUN SƯƠNG"
+            : "ĐANG TẮT";
+    }
+
+
+    // ----------------------------------------------
+    // MISTER DUTY
+    // ----------------------------------------------
+
+    if (typeof data.mister_duty === "number") {
+
+        document.getElementById("misterDuty").innerText =
+            data.mister_duty + "%";
+
+        document.getElementById("misterProgress").style.width =
+            data.mister_duty + "%";
+    }
+
+
+    // ----------------------------------------------
+    // MISTER DURATION
+    // ----------------------------------------------
+
+    if (typeof data.mister_duration_s === "number") {
+
+        document.getElementById("misterDuration").innerText =
+            data.mister_duration_s + " giây";
+    }
+
+
+    // ----------------------------------------------
+    // SYNC COUNTDOWN FROM ESP32
+    // ----------------------------------------------
+
+    if (typeof data.mister_elapsed_s === "number") {
+
+        misterElapsedDisplay =
+            data.mister_elapsed_s;
+    }
+
+
+    if (typeof data.mister_remaining_s === "number") {
+
+        misterRemainingDisplay =
+            data.mister_remaining_s;
+    }
+
+
+    // ESP32 bao tat: dung bo dem
+    if (!misterIsRunning) {
+
+        misterRemainingDisplay = 0;
+    }
+
+    lastCountdownTime = Date.now();
+
+    updateMisterDisplay();
+
+
+    // ----------------------------------------------
+    // UPDATE CHARTS
+    // ----------------------------------------------
+
+    const time =
+        new Date().toLocaleTimeString("vi-VN");
+
+    labels.push(time);
+
+    temperatureData.push(data.temperature);
+
+    humidityData.push(data.humidity);
+
+
+    // Chi luu 30 mau gan nhat
+    if (labels.length > 30) {
+
+        labels.shift();
+
+        temperatureData.shift();
+
+        humidityData.shift();
+    }
+
+    temperatureChart.update("none");
+
+    humidityChart.update("none");
+}
+
+
+// ==================================================
+// 9. MANUAL DEVICE CONTROL
+// ==================================================
+
+function controlDevice(device, command) {
+
+    if (!mqttClient || !mqttClient.connected) {
+
+        alert("MQTT chưa kết nối!");
+
+        return;
+    }
+
+    let topic;
+
+    if (device === "pump") {
+
+        topic = TOPIC_PUMP;
+
+    } else if (device === "fan") {
+
+        topic = TOPIC_FAN;
+
+    } else {
+
+        return;
+    }
+
+
+    mqttClient.publish(
+        topic,
+        command,
+        { qos: 0 },
+
+        function(error) {
+
+            if (error) {
+
+                alert("Gửi lệnh thất bại!");
+
+            } else {
+
+                if (device === "pump") {
+
+                    lastPumpCommand = command;
+
+                    document.getElementById("pumpCommand").innerText =
+                        command;
+
+                } else {
+
+                    lastFanCommand = command;
+
+                    document.getElementById("fanCommand").innerText =
+                        command;
+                }
+
+                console.log(
+                    "Sent:",
+                    topic,
+                    command
+                );
+            }
+        }
+    );
+}
+
+
+// ==================================================
+// 10. START SYSTEM
+// ==================================================
+
+connectMQTT();
+
+</script>
+
+</body>
+</html>
